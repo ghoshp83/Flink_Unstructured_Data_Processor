@@ -1,0 +1,47 @@
+replicaCount:
+  jobmanager: 1
+  taskmanager: 2
+
+image:
+  repository: flink-log-processor
+  tag: latest
+  pullPolicy: IfNotPresent
+
+jobmanager:
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  service:
+    type: LoadBalancer
+    port: 8081
+
+taskmanager:
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  numberOfTaskSlots: 2
+
+flink:
+  parallelism: 4
+  checkpointInterval: 300000
+  stateBackend: rocksdb
+
+aws:
+  region: us-east-1
+  s3:
+    inputPath: s3://your-bucket/logs/
+    warehouse: s3://your-bucket/warehouse/
+
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    port: 9249

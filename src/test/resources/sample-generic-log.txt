@@ -1,0 +1,4 @@
+2024-01-15T10:30:00.123Z INFO Application started successfully
+2024-01-15T10:30:01.456Z WARN Database connection pool is running low
+2024-01-15T10:30:02.789Z ERROR Failed to process request: timeout exceeded
+2024-01-15T10:30:03.012Z INFO Request processed in 150ms
