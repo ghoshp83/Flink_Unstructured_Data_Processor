@@ -1,0 +1,32 @@
+[
+  {
+    "PropertyGroupId": "job.config",
+    "PropertyMap": {
+      "source.window": "1",
+      "source.s3path": "s3a://flink-logs/",
+      "log.type": "application",
+      "log.pattern": "%{TIMESTAMP_ISO8601:timestamp} %{WORD:level} %{GREEDYDATA:message}"
+    }
+  },
+  {
+    "PropertyGroupId": "iceberg.config",
+    "PropertyMap": {
+      "iceberg.database.name": "logs_db",
+      "iceberg.table.name.default": "parsed_logs",
+      "iceberg.warehouse": "s3a://flink-iceberg-warehouse",
+      "iceberg.write.parallelism": "1"
+    }
+  },
+  {
+    "PropertyGroupId": "iceberg.table.properties",
+    "PropertyMap": {
+      "format-version": "2",
+      "write.target-file-size-bytes": "134217728",
+      "write.parquet.row-group-size-bytes": "33554432",
+      "write.parquet.page-size-bytes": "1048576",
+      "write.metadata.delete-after-commit.enabled": "true",
+      "write.metadata.previous-versions-max": "3",
+      "write.distribution-mode": "hash"
+    }
+  }
+]

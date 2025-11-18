@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  localstack:
+    image: localstack/localstack:3.0
+    container_name: flink-localstack
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    environment:
+      - SERVICES=s3,glue
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "./examples/sample-logs:/tmp/sample-logs"
+      - "./examples/init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh"
+    networks:
+      - flink-network
+
+  jobmanager:
+    image: flink:1.18.1-scala_2.12-java11
+    container_name: flink-jobmanager
+    ports:
+      - "8081:8081"
+    command: >
+      bash -c "mkdir -p /opt/flink/plugins/s3-fs-hadoop && 
+               cp /opt/flink/opt/flink-s3-fs-hadoop-*.jar /opt/flink/plugins/s3-fs-hadoop/ && 
+               /docker-entrypoint.sh jobmanager"
+    environment:
+      - FLINK_LOCAL_MODE=true
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 2
+        parallelism.default: 1
+        s3.endpoint: http://localstack:4566
+        s3.path.style.access: true
+        s3.access-key: test
+        s3.secret-key: test
+    volumes:
+      - ./target:/opt/flink/usrlib
+    networks:
+      - flink-network
+    depends_on:
+      - localstack
+
+  taskmanager:
+    image: flink:1.18.1-scala_2.12-java11
+    container_name: flink-taskmanager
+    depends_on:
+      - jobmanager
+      - localstack
+    command: >
+      bash -c "mkdir -p /opt/flink/plugins/s3-fs-hadoop && 
+               cp /opt/flink/opt/flink-s3-fs-hadoop-*.jar /opt/flink/plugins/s3-fs-hadoop/ && 
+               /docker-entrypoint.sh taskmanager"
+    environment:
+      - FLINK_LOCAL_MODE=true
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 2
+        parallelism.default: 1
+        s3.endpoint: http://localstack:4566
+        s3.path.style.access: true
+        s3.access-key: test
+        s3.secret-key: test
+    volumes:
+      - ./target:/opt/flink/usrlib
+    networks:
+      - flink-network
+
+networks:
+  flink-network:
+    driver: bridge

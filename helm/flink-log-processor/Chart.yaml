@@ -1,0 +1,13 @@
+apiVersion: v2
+name: flink-log-processor
+description: A Helm chart for Flink Unstructured Data Processor
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - flink
+  - logs
+  - data-processing
+maintainers:
+  - name: Your Name
+    email: your.email@example.com

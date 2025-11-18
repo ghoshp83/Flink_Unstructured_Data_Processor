@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "flink-log-processor.fullname" . }}-jobmanager
+spec:
+  replicas: {{ .Values.replicaCount.jobmanager }}
+  selector:
+    matchLabels:
+      app: flink
+      component: jobmanager
+  template:
+    metadata:
+      labels:
+        app: flink
+        component: jobmanager
+    spec:
+      containers:
+      - name: jobmanager
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        args: ["jobmanager"]
+        ports:
+        - containerPort: 6123
+          name: rpc
+        - containerPort: 8081
+          name: ui
+        {{- if .Values.monitoring.prometheus.enabled }}
+        - containerPort: {{ .Values.monitoring.prometheus.port }}
+          name: metrics
+        {{- end }}
+        env:
+        - name: FLINK_PROPERTIES
+          value: |
+            jobmanager.rpc.address: {{ include "flink-log-processor.fullname" . }}-jobmanager
+            parallelism.default: {{ .Values.flink.parallelism }}
+        resources:
+          {{- toYaml .Values.jobmanager.resources | nindent 10 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "flink-log-processor.fullname" . }}-taskmanager
+spec:
+  replicas: {{ .Values.replicaCount.taskmanager }}
+  selector:
+    matchLabels:
+      app: flink
+      component: taskmanager
+  template:
+    metadata:
+      labels:
+        app: flink
+        component: taskmanager
+    spec:
+      containers:
+      - name: taskmanager
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        args: ["taskmanager"]
+        env:
+        - name: FLINK_PROPERTIES
+          value: |
+            jobmanager.rpc.address: {{ include "flink-log-processor.fullname" . }}-jobmanager
+            taskmanager.numberOfTaskSlots: {{ .Values.taskmanager.numberOfTaskSlots }}
+        resources:
+          {{- toYaml .Values.taskmanager.resources | nindent 10 }}

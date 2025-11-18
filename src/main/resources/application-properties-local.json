@@ -1,0 +1,43 @@
+[
+  {
+    "PropertyGroupId": "job.config",
+    "PropertyMap": {
+      "source.window" : 1,
+      "source.s3path" : "s3://flink-quickstart-pralay/seclog/"
+    }
+  },
+  {
+    "PropertyGroupId": "log.patterns",
+    "PropertyMap": {
+      "pattern.apache": "%{COMBINEDAPACHELOG}",
+      "pattern.syslog": "%{SYSLOGBASE} %{GREEDYDATA:message}",
+      "pattern.json": "%{GREEDYDATA:json_data}"
+    }
+  },
+  {
+    "PropertyGroupId": "iceberg.table.properties",
+    "PropertyMap": {
+      "format-version": "2",
+      "write.target-file-size-bytes" : "536870912",
+      "write.parquet.row-group-size-bytes" : "134217728",
+      "write.parquet.page-size-bytes" : "1048576",
+      "write.metadata.delete-after-commit.enabled" : "true",
+      "write.metadata.previous-versions-max" : "5",
+      "write.delete.mode" : "copy-on-write",
+      "write.update.mode" : "copy-on-write",
+      "write.merge.mode" : "copy-on-write",
+      "write.distribution-mode" : "hash"
+    }
+  },
+  {
+    "PropertyGroupId": "iceberg.config",
+    "PropertyMap": {
+      "iceberg.database.name": "logs_db",
+      "iceberg.table.name.sla": "sla_logs",
+      "iceberg.table.name.ids": "ids_logs",
+      "iceberg.table.name.generic": "parsed_logs",
+      "iceberg.warehouse": "s3://flink-quickstart-pralay-s3-write-issue",
+      "iceberg.write.parallelism": "4"
+    }
+  }
+]
