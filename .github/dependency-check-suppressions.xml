@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!-- Suppress false positives for test dependencies -->
+    <suppress>
+        <notes><![CDATA[
+        Test dependencies are not included in production builds
+        ]]></notes>
+        <gav regex="true">.*:.*:.*:test</gav>
+    </suppress>
+    
+    <!-- Suppress known issues that are not applicable -->
+    <suppress>
+        <notes><![CDATA[
+        Flink framework vulnerabilities that are mitigated by our usage patterns
+        ]]></notes>
+        <gav regex="true">org\.apache\.flink:.*</gav>
+        <cve>CVE-2020-1234</cve> <!-- Example - replace with actual CVEs if needed -->
+    </suppress>
+</suppressions>

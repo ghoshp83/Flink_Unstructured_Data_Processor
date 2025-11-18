@@ -32,8 +32,18 @@ jobs:
     - name: Package
       run: mvn package -DskipTests
     
+    - name: Run Security Checks
+      run: mvn com.github.spotbugs:spotbugs-maven-plugin:check
+    
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: flink-log-processor
         path: target/*.jar
+        
+    - name: Upload Security Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-reports
+        path: target/spotbugsXml.xml

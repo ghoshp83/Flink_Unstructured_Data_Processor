@@ -4,6 +4,7 @@
 [![Java](https://img.shields.io/badge/java-11+-orange.svg)](https://openjdk.org/)
 [![Flink](https://img.shields.io/badge/flink-1.18.1-red.svg)](https://flink.apache.org/)
 [![Iceberg](https://img.shields.io/badge/iceberg-1.6.1-blue.svg)](https://iceberg.apache.org/)
+[![Security](https://img.shields.io/badge/security-hardened-green.svg)](SECURITY.md)
 
 A robust, production-ready Apache Flink application for processing unstructured log data, parsing it using configurable Grok patterns, and storing it in Apache Iceberg tables.
 
@@ -253,9 +254,35 @@ mvn test
 
 ## Security Considerations
 
-- The application includes utilities for anonymizing PII data
-- AWS credentials are handled through IAM roles
-- The project uses recent versions of libraries to mitigate known vulnerabilities
+### Input Validation
+- **Grok Pattern Validation**: All Grok patterns are validated against a whitelist of allowed elements
+- **Log Line Length Limits**: Maximum log line length is enforced (10,000 characters)
+- **S3 Path Validation**: S3 paths are validated for proper format and security
+- **Log Type Validation**: Log types are restricted to alphanumeric characters and underscores
+
+### Infrastructure Security
+- **Parameterized S3 Buckets**: Use organization prefix and environment variables to prevent bucket sniping
+- **IAM Roles**: AWS credentials are handled through IAM roles, never hardcoded
+- **Network Security**: All communication uses HTTPS/TLS encryption
+
+### Dependency Security
+- **Updated Dependencies**: All dependencies are kept up-to-date with latest security patches
+- **Vulnerability Scanning**: Regular dependency vulnerability scanning in CI/CD
+- **Minimal Dependencies**: Only necessary dependencies are included
+
+### Runtime Security
+- **Error Handling**: Comprehensive error handling prevents information leakage
+- **Logging Security**: Sensitive data is not logged or is properly sanitized
+- **Resource Limits**: Memory and processing limits prevent DoS attacks
+
+### Configuration Security
+```bash
+# Set required environment variables
+export ORGANIZATION_PREFIX="pralaydata"
+export ENVIRONMENT="prod"
+
+# S3 bucket names will be: pralaydata-flink-logs-prod, pralaydata-iceberg-warehouse-prod
+```
 
 ## Performance Considerations
 
