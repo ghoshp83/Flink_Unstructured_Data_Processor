@@ -66,13 +66,18 @@ public class UnstructuredDataProcessor {
         Properties jobProperties = propertiesMap.get("job.config");
         String s3path = jobProperties.getProperty("source.s3path");
         long window = Long.parseLong(jobProperties.getProperty("source.window"));
-        String logType = jobProperties.getProperty("log.type", "generic");
-        String logPattern = jobProperties.getProperty("log.pattern", "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}");
+        String logType = validateLogType(jobProperties.getProperty("log.type", "generic"));
+        String logPattern = validateLogPattern(jobProperties.getProperty("log.pattern", "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"));
+        
         try{
+            if (s3path == null || !s3path.startsWith("s3://")) {
+                throw new IllegalArgumentException("Invalid S3 path: " + s3path);
+            }
             logSource = FileSource.forRecordStreamFormat(new TextLineInputFormat(), new Path(s3path))
                     .monitorContinuously(Duration.ofMinutes(window)).build();
         }catch(Exception e){
             log.error("{} error_message=Issue loading log file -- {}", ERROR_MESSAGE_TYPE, e.getMessage());
+            throw new RuntimeException("Failed to initialize log source", e);
         }
         defineWorkFlow(sEnv, tableLoader, logSource, logType, logPattern);
         sEnv.execute("Unstructured Data Processor");
@@ -114,4 +119,30 @@ public static void defineWorkFlow(StreamExecutionEnvironment sEnv,
                 .uid("IcebergGenericLog")
                 .name("IcebergGenericLog");
         }
+        
+    /**
+     * Validates log type to prevent injection attacks
+     */
+    private static String validateLogType(String logType) {
+        if (logType == null || !logType.matches("^[a-zA-Z0-9_-]+$") || logType.length() > 50) {
+            throw new IllegalArgumentException("Invalid log type: " + logType);
+        }
+        return logType;
+    }
+    
+    /**
+     * Validates log pattern to prevent injection attacks
+     */
+    private static String validateLogPattern(String pattern) {
+        if (pattern == null || pattern.length() > 1000) {
+            throw new IllegalArgumentException("Invalid log pattern length");
+        }
+        
+        // Basic validation for Grok pattern format
+        if (!pattern.matches("^[%{}:A-Za-z0-9_\\\\s-]+$")) {
+            throw new IllegalArgumentException("Invalid characters in log pattern");
+        }
+        
+        return pattern;
+    }
 }

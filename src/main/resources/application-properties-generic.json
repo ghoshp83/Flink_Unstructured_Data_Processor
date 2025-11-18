@@ -3,7 +3,7 @@
     "PropertyGroupId": "job.config",
     "PropertyMap": {
       "source.window" : 1,
-      "source.s3path" : "s3://your-bucket/logs/",
+      "source.s3path" : "s3://${ORGANIZATION_PREFIX}-flink-logs-${ENVIRONMENT}/logs/",
       "log.type": "generic"
     }
   },
@@ -36,7 +36,7 @@
     "PropertyMap": {
       "iceberg.database.name": "logs_db",
       "iceberg.table.name.generic": "parsed_logs",
-      "iceberg.warehouse": "s3://your-iceberg-warehouse",
+      "iceberg.warehouse": "s3://${ORGANIZATION_PREFIX}-iceberg-warehouse-${ENVIRONMENT}",
       "iceberg.write.parallelism": "4"
     }
   }

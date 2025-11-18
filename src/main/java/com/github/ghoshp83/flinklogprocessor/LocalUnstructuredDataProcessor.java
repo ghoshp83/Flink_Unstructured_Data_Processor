@@ -30,9 +30,9 @@ public class LocalUnstructuredDataProcessor {
         
         // Configuration for local testing
         String s3Endpoint = "http://localstack:4566";
-        String s3Path = "s3a://flink-logs/";
-        String logType = "application";
-        String logPattern = "%{TIMESTAMP_ISO8601:timestamp} %{WORD:level} %{GREEDYDATA:message}";
+        String s3Path = validateS3Path("s3a://flink-logs/");
+        String logType = validateLogType("application");
+        String logPattern = validateLogPattern("%{TIMESTAMP_ISO8601:timestamp} %{WORD:level} %{GREEDYDATA:message}");
         
         // Create Flink environment
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -69,15 +69,19 @@ public class LocalUnstructuredDataProcessor {
                 @Override
                 public void processElement(String logLine, Context context, Collector<GenericLogRecord> collector) {
                     try {
-                        GenericLogRecord record = parser.parseGenericRecord(logLine, logType, logPattern);
-                        if (record != null && record.isValid()) {
-                            collector.collect(record);
-                            log.debug("Parsed record: {}", record);
+                        if (logLine != null && logLine.length() <= 10000) {
+                            GenericLogRecord record = parser.parseGenericRecord(logLine, logType, logPattern);
+                            if (record != null && record.isValid()) {
+                                collector.collect(record);
+                                log.debug("Parsed record: {}", record);
+                            } else {
+                                log.warn("Failed to parse line: {}", logLine.substring(0, Math.min(100, logLine.length())));
+                            }
                         } else {
-                            log.warn("Failed to parse line: {}", logLine);
+                            log.warn("Invalid log line length or null");
                         }
                     } catch (Exception e) {
-                        log.error("Error parsing line: {}", logLine, e);
+                        log.error("Error parsing line: {}", logLine != null ? logLine.substring(0, Math.min(100, logLine.length())) : "null", e);
                     }
                 }
             }
@@ -95,5 +99,29 @@ public class LocalUnstructuredDataProcessor {
         // Execute
         log.info("Starting Flink job execution...");
         env.execute("Local Unstructured Data Processor");
+    }
+    
+    private static String validateS3Path(String s3Path) {
+        if (s3Path == null || !s3Path.matches("^s3a?://[a-zA-Z0-9._-]+/.*$")) {
+            throw new IllegalArgumentException("Invalid S3 path: " + s3Path);
+        }
+        return s3Path;
+    }
+    
+    private static String validateLogType(String logType) {
+        if (logType == null || !logType.matches("^[a-zA-Z0-9_-]+$") || logType.length() > 50) {
+            throw new IllegalArgumentException("Invalid log type: " + logType);
+        }
+        return logType;
+    }
+    
+    private static String validateLogPattern(String pattern) {
+        if (pattern == null || pattern.length() > 1000) {
+            throw new IllegalArgumentException("Invalid log pattern length");
+        }
+        if (!pattern.matches("^[%{}:A-Za-z0-9_\\\\s-]+$")) {
+            throw new IllegalArgumentException("Invalid characters in log pattern");
+        }
+        return pattern;
     }
 }

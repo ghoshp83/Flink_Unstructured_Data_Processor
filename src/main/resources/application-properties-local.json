@@ -3,7 +3,7 @@
     "PropertyGroupId": "job.config",
     "PropertyMap": {
       "source.window" : 1,
-      "source.s3path" : "s3://flink-quickstart-pralay/seclog/"
+      "source.s3path" : "s3://${ORGANIZATION_PREFIX}-flink-logs-${ENVIRONMENT}/seclog/"
     }
   },
   {
@@ -36,7 +36,7 @@
       "iceberg.table.name.sla": "sla_logs",
       "iceberg.table.name.ids": "ids_logs",
       "iceberg.table.name.generic": "parsed_logs",
-      "iceberg.warehouse": "s3://flink-quickstart-pralay-s3-write-issue",
+      "iceberg.warehouse": "s3://${ORGANIZATION_PREFIX}-iceberg-warehouse-${ENVIRONMENT}",
       "iceberg.write.parallelism": "4"
     }
   }

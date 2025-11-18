@@ -44,9 +44,9 @@ public class SimpleLocalProcessor {
             )
         );
         
-        String s3Path = "s3a://flink-logs/";
-        String logType = "application";
-        String logPattern = "%{TIMESTAMP_ISO8601:timestamp} %{WORD:level} %{GREEDYDATA:message}";
+        String s3Path = validateS3Path("s3a://flink-logs/");
+        String logType = validateLogType("application");
+        String logPattern = validateLogPattern("%{TIMESTAMP_ISO8601:timestamp} %{WORD:level} %{GREEDYDATA:message}");
         
         log.info("Reading from: {}", s3Path);
         
@@ -63,9 +63,15 @@ public class SimpleLocalProcessor {
             new ProcessFunction<String, GenericLogRecord>() {
                 @Override
                 public void processElement(String logLine, Context context, Collector<GenericLogRecord> collector) {
-                    GenericLogRecord record = parser.parseGenericRecord(logLine, logType, logPattern);
-                    if (record != null && record.isValid()) {
-                        collector.collect(record);
+                    try {
+                        if (logLine != null && logLine.length() <= 10000) {
+                            GenericLogRecord record = parser.parseGenericRecord(logLine, logType, logPattern);
+                            if (record != null && record.isValid()) {
+                                collector.collect(record);
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.error("Error processing log line: {}", logLine, e);
                     }
                 }
             }
@@ -74,5 +80,29 @@ public class SimpleLocalProcessor {
         parsedStream.print();
         
         env.execute("Simple Local Processor");
+    }
+    
+    private static String validateS3Path(String s3Path) {
+        if (s3Path == null || !s3Path.matches("^s3a?://[a-zA-Z0-9._-]+/.*$")) {
+            throw new IllegalArgumentException("Invalid S3 path: " + s3Path);
+        }
+        return s3Path;
+    }
+    
+    private static String validateLogType(String logType) {
+        if (logType == null || !logType.matches("^[a-zA-Z0-9_-]+$") || logType.length() > 50) {
+            throw new IllegalArgumentException("Invalid log type: " + logType);
+        }
+        return logType;
+    }
+    
+    private static String validateLogPattern(String pattern) {
+        if (pattern == null || pattern.length() > 1000) {
+            throw new IllegalArgumentException("Invalid log pattern length");
+        }
+        if (!pattern.matches("^[%{}:A-Za-z0-9_\\\\s-]+$")) {
+            throw new IllegalArgumentException("Invalid characters in log pattern");
+        }
+        return pattern;
     }
 }
