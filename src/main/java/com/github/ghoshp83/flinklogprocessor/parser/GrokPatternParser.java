@@ -14,7 +14,9 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.concurrent.ConcurrentHashMap;
 import com.github.ghoshp83.flinklogprocessor.model.GenericLogRecord;
+import com.github.ghoshp83.flinklogprocessor.util.CircuitBreaker;
 
 public class GrokPatternParser implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -43,6 +45,8 @@ public class GrokPatternParser implements Serializable {
 
     private transient Map<String, Grok> genericGrokMap;
     private Map<String, String> genericPatterns;
+    private transient CircuitBreaker parsingCircuitBreaker;
+    private transient Map<String, Integer> patternFailureCount;
 
     public GrokPatternParser() {
         this(new java.util.HashMap<>());
@@ -50,12 +54,20 @@ public class GrokPatternParser implements Serializable {
     
     public GrokPatternParser(Map<String, String> genericPatterns) {
         this.genericPatterns = genericPatterns;
-        this.genericGrokMap = new java.util.HashMap<>();
+        this.genericGrokMap = new ConcurrentHashMap<>();
+        this.parsingCircuitBreaker = new CircuitBreaker(5, 60000); // 5 failures, 60s timeout
+        this.patternFailureCount = new ConcurrentHashMap<>();
     }
 
     private void ensureGrokInitialized() {
         if (genericGrokMap == null) {
-            genericGrokMap = new java.util.HashMap<>();
+            genericGrokMap = new ConcurrentHashMap<>();
+        }
+        if (parsingCircuitBreaker == null) {
+            parsingCircuitBreaker = new CircuitBreaker(5, 60000);
+        }
+        if (patternFailureCount == null) {
+            patternFailureCount = new ConcurrentHashMap<>();
         }
     }
     
@@ -63,34 +75,67 @@ public class GrokPatternParser implements Serializable {
         try {
             // Security: Validate inputs
             if (!isValidInput(line, logType, pattern)) {
-                LOG.warn("Invalid input detected for security reasons");
+                LOG.warn("Invalid input detected for security reasons - logType: {}", logType);
                 return null;
             }
             
             ensureGrokInitialized();
             
-            Grok grok = genericGrokMap.get(logType);
-            if (grok == null) {
-                GrokCompiler compiler = GrokCompiler.newInstance();
-                compiler.registerDefaultPatterns();
-                grok = compiler.compile(pattern);
-                genericGrokMap.put(logType, grok);
-            }
-            
-            Map<String, Object> match = grok.match(line).capture();
-            if (match.isEmpty()) {
-                LOG.warn("Failed to parse generic record for type {}: {}", logType, line);
+            // Check if this pattern has failed too many times
+            String patternKey = logType + ":" + pattern;
+            Integer failureCount = patternFailureCount.getOrDefault(patternKey, 0);
+            if (failureCount > 10) {
+                LOG.warn("Pattern {} has failed {} times, skipping", patternKey, failureCount);
                 return null;
             }
             
-            GenericLogRecord record = new GenericLogRecord(line, logType);
-            for (Map.Entry<String, Object> entry : match.entrySet()) {
-                record.setField(entry.getKey(), entry.getValue());
-            }
+            return parsingCircuitBreaker.execute(() -> {
+                try {
+                    Grok grok = genericGrokMap.get(logType);
+                    if (grok == null) {
+                        LOG.debug("Compiling new Grok pattern for logType: {}", logType);
+                        GrokCompiler compiler = GrokCompiler.newInstance();
+                        compiler.registerDefaultPatterns();
+                        grok = compiler.compile(pattern);
+                        genericGrokMap.put(logType, grok);
+                        LOG.debug("Successfully compiled Grok pattern for logType: {}", logType);
+                    }
+                    
+                    Map<String, Object> match = grok.match(line).capture();
+                    if (match.isEmpty()) {
+                        // Increment failure count for this pattern
+                        patternFailureCount.put(patternKey, failureCount + 1);
+                        LOG.debug("Failed to parse line with pattern {} (failure count: {}): {}", 
+                                 logType, failureCount + 1, line.length() > 100 ? line.substring(0, 100) + "..." : line);
+                        return null;
+                    }
+                    
+                    // Reset failure count on success
+                    patternFailureCount.remove(patternKey);
+                    
+                    GenericLogRecord record = new GenericLogRecord(line, logType);
+                    for (Map.Entry<String, Object> entry : match.entrySet()) {
+                        if (entry.getValue() != null) {
+                            record.setField(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    
+                    LOG.debug("Successfully parsed record for logType: {} with {} fields", logType, match.size());
+                    return record;
+                    
+                } catch (Exception e) {
+                    // Increment failure count for this pattern
+                    patternFailureCount.put(patternKey, failureCount + 1);
+                    LOG.error("Error in Grok parsing for logType {}: {}", logType, e.getMessage(), e);
+                    throw new RuntimeException("Grok parsing failed for logType: " + logType, e);
+                }
+            }, "grok-parsing-" + logType);
             
-            return record;
+        } catch (RuntimeException e) {
+            LOG.error("Runtime error parsing generic record for logType {}: {}", logType, e.getMessage(), e);
+            return null;
         } catch (Exception e) {
-            LOG.error("Error parsing generic record for type {}: {}", logType, line, e);
+            LOG.error("Unexpected error parsing generic record for logType {}: {}", logType, e.getMessage(), e);
             return null;
         }
     }
