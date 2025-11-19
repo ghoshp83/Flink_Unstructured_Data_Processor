@@ -5,7 +5,7 @@
 
 package com.github.ghoshp83.flinklogprocessor.exception;
 
-public class RetryableException extends LogProcessingException {
+public class RetryableException extends RuntimeException {
     private static final long serialVersionUID = 1L;
     
     public RetryableException(String message) {
