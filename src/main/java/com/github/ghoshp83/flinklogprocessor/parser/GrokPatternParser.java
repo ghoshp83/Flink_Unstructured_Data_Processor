@@ -47,6 +47,13 @@ public class GrokPatternParser implements Serializable {
     private Map<String, String> genericPatterns;
     private transient CircuitBreaker parsingCircuitBreaker;
     private transient Map<String, Integer> patternFailureCount;
+    
+    // Performance: Cache for pattern keys to avoid string concatenation
+    private transient Map<String, String> patternKeyCache;
+    
+    // Performance: Reusable StringBuilder for string operations
+    private static final ThreadLocal<StringBuilder> STRING_BUILDER_CACHE = 
+        ThreadLocal.withInitial(() -> new StringBuilder(256));
 
     public GrokPatternParser() {
         this(new java.util.HashMap<>());
@@ -57,6 +64,7 @@ public class GrokPatternParser implements Serializable {
         this.genericGrokMap = new ConcurrentHashMap<>();
         this.parsingCircuitBreaker = new CircuitBreaker(5, 60000); // 5 failures, 60s timeout
         this.patternFailureCount = new ConcurrentHashMap<>();
+        this.patternKeyCache = new ConcurrentHashMap<>();
     }
 
     private void ensureGrokInitialized() {
@@ -68,6 +76,9 @@ public class GrokPatternParser implements Serializable {
         }
         if (patternFailureCount == null) {
             patternFailureCount = new ConcurrentHashMap<>();
+        }
+        if (patternKeyCache == null) {
+            patternKeyCache = new ConcurrentHashMap<>();
         }
     }
     
@@ -81,8 +92,8 @@ public class GrokPatternParser implements Serializable {
             
             ensureGrokInitialized();
             
-            // Check if this pattern has failed too many times
-            String patternKey = logType + ":" + pattern;
+            // Performance: Use cached pattern key to avoid string concatenation
+            String patternKey = getPatternKey(logType, pattern);
             Integer failureCount = patternFailureCount.getOrDefault(patternKey, 0);
             if (failureCount > 10) {
                 LOG.warn("Pattern {} has failed {} times, skipping", patternKey, failureCount);
@@ -105,8 +116,11 @@ public class GrokPatternParser implements Serializable {
                     if (match.isEmpty()) {
                         // Increment failure count for this pattern
                         patternFailureCount.put(patternKey, failureCount + 1);
-                        LOG.debug("Failed to parse line with pattern {} (failure count: {}): {}", 
-                                 logType, failureCount + 1, line.length() > 100 ? line.substring(0, 100) + "..." : line);
+                        // Performance: Optimize log message string operations
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Failed to parse line with pattern {} (failure count: {}): {}", 
+                                     logType, failureCount + 1, truncateString(line, 100));
+                        }
                         return null;
                     }
                     
@@ -155,6 +169,28 @@ public class GrokPatternParser implements Serializable {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+    
+    /**
+     * Performance: Get or create cached pattern key to avoid repeated string concatenation
+     */
+    private String getPatternKey(String logType, String pattern) {
+        // Use computeIfAbsent for thread-safe caching
+        return patternKeyCache.computeIfAbsent(logType + pattern.hashCode(), 
+            k -> logType + ":" + pattern);
+    }
+    
+    /**
+     * Performance: Efficiently truncate strings using cached StringBuilder
+     */
+    private String truncateString(String str, int maxLength) {
+        if (str.length() <= maxLength) {
+            return str;
+        }
+        StringBuilder sb = STRING_BUILDER_CACHE.get();
+        sb.setLength(0); // Clear previous content
+        sb.append(str, 0, maxLength).append("...");
+        return sb.toString();
     }
     
     /**
