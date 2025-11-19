@@ -12,6 +12,9 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.flink.CatalogLoader;
+import com.github.ghoshp83.flinklogprocessor.util.RetryUtil;
+import com.github.ghoshp83.flinklogprocessor.util.CircuitBreaker;
+
 
 import java.util.*;
 
@@ -20,9 +23,23 @@ import static com.github.ghoshp83.flinklogprocessor.config.LogConf.*;
 
 @Slf4j
 public class IcebergTableManager {
+  private static final CircuitBreaker catalogCircuitBreaker = new CircuitBreaker(3, 30000); // 3 failures, 30s timeout
+  
   public static CatalogLoader getCatalogLoader(Map<String, Properties> propertiesMap) {
-    Properties icebergProperties = propertiesMap.get("iceberg.config");
-    String warehouse = icebergProperties.getProperty("iceberg.warehouse");
+    try {
+      if (propertiesMap == null || propertiesMap.isEmpty()) {
+        throw new RuntimeException("Properties map cannot be null or empty");
+      }
+      
+      Properties icebergProperties = propertiesMap.get("iceberg.config");
+      if (icebergProperties == null) {
+        throw new RuntimeException("iceberg.config properties not found");
+      }
+      
+      String warehouse = icebergProperties.getProperty("iceberg.warehouse");
+      if (warehouse == null || warehouse.trim().isEmpty()) {
+        throw new RuntimeException("iceberg.warehouse property is required");
+      }
     
     Configuration hadoopConf = new Configuration();
     
@@ -49,11 +66,18 @@ public class IcebergTableManager {
       catalogProperties.put("client.region", "us-east-1");
     }
     
-    return CatalogLoader.custom(
-        "glue",
-        catalogProperties,
-        hadoopConf,
-        "org.apache.iceberg.aws.glue.GlueCatalog");
+      return RetryUtil.executeWithRetry(
+        () -> CatalogLoader.custom(
+            "glue",
+            catalogProperties,
+            hadoopConf,
+            "org.apache.iceberg.aws.glue.GlueCatalog"),
+        "create-catalog-loader"
+      );
+    } catch (Exception e) {
+      log.error("Failed to create catalog loader", e);
+      throw new RuntimeException("Failed to create Iceberg catalog loader", e);
+    }
   }
 
   public static TableIdentifier getTableIdentifier(Map<String, Properties> propertiesMap, String logType) {
@@ -84,20 +108,56 @@ public class IcebergTableManager {
   public static void createIcebergTable(org.apache.iceberg.catalog.Catalog catalog,
                                         Map<String, Properties> propertiesMap,
                                         String logType) {
-    TableIdentifier outputTable = getTableIdentifier(propertiesMap, logType);
-    List<org.apache.iceberg.types.Types.NestedField> columns = IcebergColumnDefinitions.getIcebergColumns(logType);
-    Schema schema = new Schema(columns);
-    PartitionSpec partitionSpec = IcebergSchemaManager.getPartitionSpec(schema, logType);
-    Map<String, String> tableProperties = getTableProperties(propertiesMap);
-
-    if (!catalog.tableExists(outputTable)) {
-      Table icebergTable = catalog.createTable(outputTable, schema, partitionSpec, tableProperties);
-      log.info("Table {} created.", icebergTable.name());
-
-    } else {
-      log.info(String.valueOf(outputTable));
-      Table icebergTableInit = catalog.loadTable(outputTable);
-      log.info("Table {} already exists.", icebergTableInit.name());
+    try {
+      if (catalog == null) {
+        throw new RuntimeException("Catalog cannot be null");
+      }
+      if (propertiesMap == null || propertiesMap.isEmpty()) {
+        throw new RuntimeException("Properties map cannot be null or empty");
+      }
+      if (logType == null || logType.trim().isEmpty()) {
+        throw new RuntimeException("Log type cannot be null or empty");
+      }
+      
+      TableIdentifier outputTable = getTableIdentifier(propertiesMap, logType);
+      log.info("Creating/verifying Iceberg table: {}", outputTable);
+      
+      try {
+        catalogCircuitBreaker.execute(() -> {
+          try {
+            List<org.apache.iceberg.types.Types.NestedField> columns = IcebergColumnDefinitions.getIcebergColumns(logType);
+            if (columns == null || columns.isEmpty()) {
+              throw new RuntimeException("No columns defined for log type: " + logType);
+            }
+            
+            Schema schema = new Schema(columns);
+            PartitionSpec partitionSpec = IcebergSchemaManager.getPartitionSpec(schema, logType);
+            Map<String, String> tableProperties = getTableProperties(propertiesMap);
+            
+            if (!catalog.tableExists(outputTable)) {
+              log.info("Table {} does not exist, creating...", outputTable);
+              Table icebergTable = catalog.createTable(outputTable, schema, partitionSpec, tableProperties);
+              log.info("Table {} created successfully", icebergTable.name());
+            } else {
+              log.info("Table {} already exists, verifying schema...", outputTable);
+              Table existingTable = catalog.loadTable(outputTable);
+              log.info("Table {} verified successfully", existingTable.name());
+            }
+            return null;
+          } catch (Exception e) {
+            log.error("Error in table creation/verification for {}", outputTable, e);
+            throw new RuntimeException("Failed to create/verify table: " + outputTable, e);
+          }
+        }, "create-iceberg-table");
+      } catch (RuntimeException e) {
+        throw new RuntimeException(e.getMessage(), e);
+      }
+      
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      log.error("Unexpected error creating Iceberg table for log type: {}", logType, e);
+      throw new RuntimeException("Failed to create Iceberg table", e);
     }
   }
 }
