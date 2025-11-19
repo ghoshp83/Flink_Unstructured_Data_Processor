@@ -5,7 +5,6 @@
 
 package com.github.ghoshp83.flinklogprocessor.util;
 
-import com.github.ghoshp83.flinklogprocessor.exception.LogProcessingException;
 import com.github.ghoshp83.flinklogprocessor.exception.RetryableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +30,7 @@ public class ErrorHandler {
     /**
      * Execute operation with comprehensive error handling
      */
-    public static <T> T executeWithErrorHandling(Supplier<T> operation, String operationName) throws LogProcessingException {
+    public static <T> T executeWithErrorHandling(Supplier<T> operation, String operationName) {
         return executeWithErrorHandling(operation, operationName, null, true);
     }
     
@@ -39,7 +38,7 @@ public class ErrorHandler {
      * Execute operation with error handling and optional fallback
      */
     public static <T> T executeWithErrorHandling(Supplier<T> operation, String operationName, 
-                                                 Supplier<T> fallback, boolean logErrors) throws LogProcessingException {
+                                                 Supplier<T> fallback, boolean logErrors) {
         try {
             return operation.get();
         } catch (Exception e) {
@@ -49,17 +48,17 @@ public class ErrorHandler {
             if (fallback != null) {
                 return fallback.get();
             }
-            if (e instanceof LogProcessingException) {
-                throw (LogProcessingException) e;
+            if (e instanceof RuntimeException) {
+                throw (RuntimeException) e;
             }
-            throw new LogProcessingException("Error in " + operationName, e);
+            throw new RuntimeException("Error in " + operationName, e);
         }
     }
     
     /**
      * Execute operation with error handling (void return)
      */
-    public static void executeWithErrorHandling(Runnable operation, String operationName) throws LogProcessingException {
+    public static void executeWithErrorHandling(Runnable operation, String operationName) {
         executeWithErrorHandling(() -> {
             operation.run();
             return null;
@@ -70,7 +69,7 @@ public class ErrorHandler {
      * Execute operation with error handling and custom error handler
      */
     public static <T> T executeWithErrorHandling(Supplier<T> operation, String operationName, 
-                                                 Consumer<Exception> errorHandler) throws LogProcessingException {
+                                                 Consumer<Exception> errorHandler) {
         try {
             return operation.get();
         } catch (Exception e) {
@@ -80,10 +79,10 @@ public class ErrorHandler {
             if (errorHandler != null) {
                 errorHandler.accept(e);
             }
-            if (e instanceof LogProcessingException) {
-                throw (LogProcessingException) e;
+            if (e instanceof RuntimeException) {
+                throw (RuntimeException) e;
             }
-            throw new LogProcessingException("Error in " + operationName, e);
+            throw new RuntimeException("Error in " + operationName, e);
         }
     }
     
