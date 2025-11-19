@@ -43,6 +43,15 @@ public class IcebergTableManager {
     
     Configuration hadoopConf = new Configuration();
     
+    // Performance: Configure connection pooling for S3
+    hadoopConf.set("fs.s3a.connection.maximum", "50");
+    hadoopConf.set("fs.s3a.threads.max", "20");
+    hadoopConf.set("fs.s3a.connection.timeout", "200000");
+    hadoopConf.set("fs.s3a.connection.establish.timeout", "5000");
+    hadoopConf.set("fs.s3a.attempts.maximum", "3");
+    hadoopConf.set("fs.s3a.retry.limit", "3");
+    hadoopConf.set("fs.s3a.retry.interval", "500ms");
+    
     // Configure for LocalStack if in local mode
     boolean isLocal = System.getenv("FLINK_LOCAL_MODE") != null;
     if (isLocal) {
@@ -59,11 +68,22 @@ public class IcebergTableManager {
     catalogProperties.put("warehouse", warehouse);
     catalogProperties.put("io-impl", "org.apache.iceberg.aws.s3.S3FileIO");
     
+    // Performance: Configure connection pooling for AWS clients
+    catalogProperties.put("s3.connection-pool-size", "50");
+    catalogProperties.put("s3.connection-timeout-ms", "30000");
+    catalogProperties.put("s3.socket-timeout-ms", "30000");
+    catalogProperties.put("glue.max-connections", "50");
+    catalogProperties.put("glue.connection-timeout-ms", "30000");
+    
     if (isLocal) {
+      log.info("Using LocalStack endpoints with reduced connection pool");
       catalogProperties.put("s3.endpoint", "http://localstack:4566");
       catalogProperties.put("s3.path-style-access", "true");
       catalogProperties.put("glue.endpoint", "http://localstack:4566");
       catalogProperties.put("client.region", "us-east-1");
+      // Reduce pool size for local testing
+      catalogProperties.put("s3.connection-pool-size", "10");
+      catalogProperties.put("glue.max-connections", "10");
     }
     
       return RetryUtil.executeWithRetry(
