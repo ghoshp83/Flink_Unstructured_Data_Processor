@@ -10,6 +10,10 @@ import com.github.ghoshp83.flinklogprocessor.model.GenericLogRecord;
 import com.github.ghoshp83.flinklogprocessor.parser.GrokPatternParser;
 import com.github.ghoshp83.flinklogprocessor.util.ErrorHandler;
 import com.github.ghoshp83.flinklogprocessor.util.RetryUtil;
+import com.github.ghoshp83.flinklogprocessor.health.HealthCheckService;
+import com.github.ghoshp83.flinklogprocessor.health.MetricsDashboard;
+import com.github.ghoshp83.flinklogprocessor.config.ConfigValidator;
+import com.github.ghoshp83.flinklogprocessor.dlq.DeadLetterQueue;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
@@ -44,6 +48,8 @@ public class UnstructuredDataProcessor {
     private static FileSource<String> logSource = null;
     private static final String ERROR_MESSAGE_TYPE = "Log-Data-Processor, error_type=file-error";
     static GrokPatternParser parser = new GrokPatternParser();
+    private static final HealthCheckService healthCheck = new HealthCheckService();
+    private static final MetricsDashboard metrics = new MetricsDashboard();
 
     public static void main(String[] args) {
         try {
@@ -65,6 +71,14 @@ public class UnstructuredDataProcessor {
             log.info("Running in AWS KDA mode - loading config from runtime");
             propertiesMap = initPropertiesMap(sEnv, PROPERTIES_FILE);
         }
+        
+        // Validate configuration
+        ConfigValidator.ValidationResult validation = ConfigValidator.validate(propertiesMap);
+        if (!validation.isValid()) {
+            log.error("Configuration validation failed:\n{}", validation);
+            throw new RuntimeException("Invalid configuration");
+        }
+        log.info("Configuration validated successfully");
         CatalogLoader catalogLoader = getCatalogLoader(propertiesMap);
         createIcebergTable(catalogLoader.loadCatalog(), propertiesMap, LOG_GENERIC);
         TableLoader tableLoader = TableLoader.fromCatalog(catalogLoader, getTableIdentifier(propertiesMap, LOG_GENERIC));
@@ -73,6 +87,7 @@ public class UnstructuredDataProcessor {
         long window = Long.parseLong(jobProperties.getProperty("source.window"));
         String logType = validateLogType(jobProperties.getProperty("log.type", "generic"));
         String logPattern = validateLogPattern(jobProperties.getProperty("log.pattern", "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"));
+        String dlqPath = jobProperties.getProperty("dlq.path", "s3a://flink-logs/dlq/");
         
             logSource = ErrorHandler.executeWithErrorHandling(
                 () -> {
@@ -85,7 +100,7 @@ public class UnstructuredDataProcessor {
                 "create-file-source"
             );
             ErrorHandler.executeWithErrorHandling(
-                () -> defineWorkFlow(sEnv, tableLoader, logSource, logType, logPattern),
+                () -> defineWorkFlow(sEnv, tableLoader, logSource, logType, logPattern, dlqPath),
                 "define-workflow"
             );
             
@@ -114,7 +129,8 @@ public static void defineWorkFlow(StreamExecutionEnvironment sEnv,
                                   TableLoader tableLoader,
                                   FileSource<String> logSource,
                                   String logType,
-                                  String logPattern) {
+                                  String logPattern,
+                                  String dlqPath) {
         try {
             if (sEnv == null) {
                 throw new RuntimeException("StreamExecutionEnvironment cannot be null");
@@ -137,6 +153,9 @@ public static void defineWorkFlow(StreamExecutionEnvironment sEnv,
                 "create-log-stream"
             );
 
+            // Create DLQ for failed records
+            DeadLetterQueue dlq = new DeadLetterQueue(dlqPath);
+            
             // Parse logs with comprehensive error handling
             SingleOutputStreamOperator<GenericLogRecord> parsedStream = logStream.process(
                 new ProcessFunction<String, GenericLogRecord>() {
@@ -145,15 +164,23 @@ public static void defineWorkFlow(StreamExecutionEnvironment sEnv,
                     private transient long lastLogTime = 0;
                     
                     @Override
+                    public void open(org.apache.flink.configuration.Configuration parameters) {
+                        metrics.setGauge("parser.active", 1);
+                    }
+                    
+                    @Override
                     public void processElement(String logLine, ProcessFunction<String, GenericLogRecord>.Context context,
                                                Collector<GenericLogRecord> collector) throws Exception {
                         processedCount++;
                         
-                        // Log progress every 10000 records
+                        // Update metrics and log progress
+                        metrics.incrementCounter("records.received");
                         long currentTime = System.currentTimeMillis();
-                        if (currentTime - lastLogTime > 30000) { // Every 30 seconds
+                        if (currentTime - lastLogTime > 30000) {
                             log.info("Processed {} records, {} errors for logType: {}", 
                                     processedCount, errorCount, logType);
+                            log.info("Health: {}", healthCheck.getHealthMetrics());
+                            metrics.logMetrics();
                             lastLogTime = currentTime;
                         }
                         
@@ -171,14 +198,24 @@ public static void defineWorkFlow(StreamExecutionEnvironment sEnv,
                             
                             if (record != null && record.isValid()) {
                                 collector.collect(record);
+                                healthCheck.recordSuccess();
+                                metrics.incrementCounter("records.parsed.success");
                             } else {
                                 errorCount++;
+                                healthCheck.recordFailure("Parse failed");
+                                metrics.incrementCounter("records.parsed.failed");
+                                context.output(new org.apache.flink.util.OutputTag<String>("dlq"){},
+                                    DeadLetterQueue.formatFailedRecord(logLine, "PARSE_ERROR", "Failed to parse log"));
                             }
                         } catch (Exception e) {
                             errorCount++;
-                            if (errorCount % 100 == 0) { // Log every 100th error
+                            healthCheck.recordFailure(e.getMessage());
+                            metrics.incrementCounter("records.exception");
+                            if (errorCount % 100 == 0) {
                                 log.warn("Parsing error #{} for logType {}: {}", errorCount, logType, e.getMessage());
                             }
+                            context.output(new org.apache.flink.util.OutputTag<String>("dlq"){},
+                                DeadLetterQueue.formatFailedRecord(logLine, "EXCEPTION", e.getMessage()));
                         }
                     }
                 }
