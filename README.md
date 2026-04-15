@@ -232,24 +232,36 @@ mvn test
 ```
 ├── src
 │   ├── main
-│   │   ├── java
-│   │   │   └── com
-│   │   │       └── enterprise
-│   │   │           └── department
-│   │   │               ├── catalog        # Iceberg catalog and schema management
-│   │   │               ├── config         # Configuration utilities
-│   │   │               ├── functions      # Flink mapping functions
-│   │   │               ├── model          # Data models
-│   │   │               ├── parser         # Log parsing logic
-│   │   │               └── UnstructuredDataProcessor.java  # Main application
+│   │   ├── java/com/github/ghoshp83/flinklogprocessor
+│   │   │   ├── catalog/         # Iceberg catalog, schema, and table management
+│   │   │   ├── config/          # Configuration loading, validation, security
+│   │   │   ├── dlq/             # Dead-letter queue for failed records
+│   │   │   ├── exception/       # Typed exceptions (retryable vs terminal)
+│   │   │   ├── functions/       # Flink map/transform functions
+│   │   │   ├── health/          # Health-check service & metrics dashboard
+│   │   │   ├── metrics/         # Prometheus metric definitions
+│   │   │   ├── model/           # Data models (GenericLogRecord)
+│   │   │   ├── parser/          # Grok pattern parser
+│   │   │   ├── util/            # CircuitBreaker, RetryUtil, ErrorHandler
+│   │   │   ├── UnstructuredDataProcessor.java        # Main (production / KDA)
+│   │   │   ├── LocalUnstructuredDataProcessor.java   # Main (local + LocalStack)
+│   │   │   └── SimpleLocalProcessor.java             # Main (minimal smoke test)
 │   │   └── resources
-│   │       ├── application-properties-local.json  # Configuration file
-│   │       └── log4j2.properties  # Logging configuration
+│   │       ├── application-properties-local.json     # Local config
+│   │       ├── application-properties-docker.json    # Docker config
+│   │       ├── application-properties-generic.json   # Generic-log patterns
+│   │       └── log4j2.properties                     # Logging configuration
 │   └── test
-│       ├── java  # Unit and integration tests
-│       └── resources  # Test resources
-├── pom.xml  # Maven configuration
-└── README.md  # This file
+│       ├── java       # Unit and integration tests
+│       └── resources  # Sample logs for tests
+├── docker-compose.yml  / docker-compose-local.yml    # Local stack
+├── Dockerfile                                        # Runtime image
+├── helm/                                             # Kubernetes chart
+├── terraform/                                        # AWS infra as code
+├── monitoring/                                       # Prometheus + Grafana
+├── .github/workflows/                                # CI: build, release, security
+├── pom.xml                                           # Maven configuration
+└── README.md
 ```
 
 ## Security Considerations
@@ -313,21 +325,19 @@ export ENVIRONMENT="prod"
 - [x] Generic log format support with configurable Grok patterns
 - [x] Dynamic schema creation based on log structure
 - [x] Comprehensive documentation and examples
-- [ ] Support for Kafka as input source
+- [x] Docker and Kubernetes deployment (Dockerfile + docker-compose + Helm chart)
+- [x] CI/CD pipeline with GitHub Actions (build, release, security scanning)
+- [x] Dead-letter queue, circuit breaker, and retry with backoff
+- [x] Prometheus metrics + Grafana dashboards
+- [ ] Support for Kafka as input source (deps are already in `pom.xml`)
+- [ ] Built-in data quality checks (schema-aware validation stage)
 - [ ] Real-time alerting based on log patterns
-- [ ] Built-in data quality checks
-- [ ] Support for multiple output formats (Parquet, ORC)
+- [ ] Support for multiple output formats (Parquet, ORC sinks)
 - [ ] Web UI for monitoring and configuration
-- [ ] CI/CD pipeline with GitHub Actions
-- [ ] Docker and Kubernetes deployment
 
 ## License
 
-MIT License - See LICENSE file for details
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+MIT License — see [LICENSE](LICENSE) for details.
 
 ## Contact
 
