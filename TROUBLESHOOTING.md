@@ -424,7 +424,7 @@ aws s3 ls s3://your-bucket/logs/
 ## Support Resources
 
 - [Apache Flink Documentation](https://flink.apache.org/docs/)
-- [Apache Iceberg Documentation](https://iceberg.apache.org/docs/)
+- [Apache Iceberg Documentation](https://iceberg.apache.org/spark-quickstart/)
 - [Grok Patterns](https://github.com/thekrakken/java-grok)
 - [AWS Kinesis Analytics](https://docs.aws.amazon.com/kinesisanalytics/latest/dev/what-is.html)
 - [GitHub Issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue)
