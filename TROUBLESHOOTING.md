@@ -426,5 +426,5 @@ aws s3 ls s3://your-bucket/logs/
 - [Apache Flink Documentation](https://flink.apache.org/docs/)
 - [Apache Iceberg Documentation](https://iceberg.apache.org/docs/)
 - [Grok Patterns](https://github.com/thekrakken/java-grok)
-- [AWS Kinesis Analytics](https://docs.aws.amazon.com/kinesisanalytics/)
-- [GitHub Issues](https://github.com/your-repo/issues)
+- [AWS Kinesis Analytics](https://docs.aws.amazon.com/kinesisanalytics/latest/dev/what-is.html)
+- [GitHub Issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue)
