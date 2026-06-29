@@ -42,9 +42,9 @@
     <properties>
         <skipTests>false</skipTests>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <flink.version>1.18.1</flink.version>
-        <iceberg.version>1.6.1</iceberg.version>
-        <target.java.version>11</target.java.version>
+        <flink.version>1.20.1</flink.version>
+        <iceberg.version>1.7.1</iceberg.version>
+        <target.java.version>17</target.java.version>
         <maven.compiler.source>${target.java.version}</maven.compiler.source>
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
         <log4j.version>2.23.1</log4j.version>
@@ -52,7 +52,7 @@
         <kda.version>2.1.0</kda.version>
         <kafka.version>3.6.1</kafka.version>
         <kafka.junit.version>3.6.0</kafka.junit.version>
-        <flink-kafka.version>3.1.0-1.18</flink-kafka.version>
+        <flink-kafka.version>3.3.0-1.20</flink-kafka.version>
         <lombok.version>1.18.32</lombok.version>
         <aws-msk-iam-auth.version>2.0.3</aws-msk-iam-auth.version>
         <fastjson2.version>2.0.48</fastjson2.version>
@@ -147,7 +147,7 @@
         <!-- Iceberg dependencies -->
         <dependency>
             <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-flink-runtime-1.18</artifactId>
+            <artifactId>iceberg-flink-runtime-1.20</artifactId>
             <version>${iceberg.version}</version>
         </dependency>
         <dependency>
