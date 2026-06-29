@@ -1,8 +1,8 @@
 # Flink Unstructured Data Processor
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Java](https://img.shields.io/badge/java-11+-orange.svg)](https://openjdk.org/)
-[![Flink](https://img.shields.io/badge/flink-1.18.1-red.svg)](https://flink.apache.org/)
+[![Java](https://img.shields.io/badge/java-17+-orange.svg)](https://openjdk.org/)
+[![Flink](https://img.shields.io/badge/flink-1.20.1-red.svg)](https://flink.apache.org/)
 [![Iceberg](https://img.shields.io/badge/iceberg-1.6.1-blue.svg)](https://iceberg.apache.org/)
 [![Security](https://img.shields.io/badge/security-hardened-green.svg)](SECURITY.md)
 
@@ -46,10 +46,10 @@ The application follows a streaming architecture:
 
 ## Prerequisites
 
-- Java 11 or higher
+- Java 17 or higher
 - Apache Maven 3.6+
 - AWS account with appropriate permissions
-- Apache Flink 1.18.1
+- Apache Flink 1.20.1
 - Apache Iceberg 1.6.1
 
 ## Configuration

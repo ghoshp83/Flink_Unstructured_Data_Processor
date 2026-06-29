@@ -2,7 +2,7 @@
 
 ## Test Environment
 
-- **Flink Version**: 1.18.1
+- **Flink Version**: 1.20.1
 - **Java Version**: 11
 - **Hardware**: 4 vCPU, 16GB RAM
 - **Parallelism**: 4

@@ -317,7 +317,7 @@ S3 (Encrypted) ──▶ Flink (In-memory) ──▶ Iceberg (Encrypted)
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| Stream Processing | Apache Flink 1.18.1 | Core engine |
+| Stream Processing | Apache Flink 1.20.1 | Core engine |
 | Data Lake | Apache Iceberg 1.6.1 | Table format |
 | Storage | Amazon S3 | Object storage |
 | Catalog | AWS Glue | Metadata |

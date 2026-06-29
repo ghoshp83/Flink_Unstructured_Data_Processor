@@ -6,7 +6,7 @@ This guide covers deploying the Flink Unstructured Data Processor in various env
 
 ## Prerequisites
 
-- Java 11+
+- Java 17+
 - Maven 3.6+
 - Docker (for containerized deployment)
 - AWS CLI (for AWS deployment)

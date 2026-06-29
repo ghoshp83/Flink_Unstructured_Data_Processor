@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-06-29
+
+### Changed
+- **Apache Flink 1.18.1 → 1.20.1**: upgraded the runtime to the current 1.20 line.
+- **Java 11 → 17**: build, Docker base image (`flink:1.20.1-scala_2.12-java17`),
+  and all CI workflows now target JDK 17 (Flink 1.20's recommended baseline).
+- **Flink Kafka connector 3.1.0-1.18 → 3.3.0-1.20**: matched to the new Flink line.
+- **Apache Iceberg 1.6.1 → 1.7.1**: `iceberg-flink-runtime-1.18` →
+  `iceberg-flink-runtime-1.20` for Flink 1.20 compatibility.
+
+### Fixed
+- Migrated the parser `ProcessFunction` off the deprecated
+  `RichFunction.open(Configuration)` to `open(OpenContext)` (Flink 1.19+ API change).
+
 ## [0.1.0] - 2024-11-18
 
 ### Added
