@@ -164,7 +164,7 @@ public static void defineWorkFlow(StreamExecutionEnvironment sEnv,
                     private transient long lastLogTime = 0;
                     
                     @Override
-                    public void open(org.apache.flink.configuration.Configuration parameters) {
+                    public void open(org.apache.flink.api.common.functions.OpenContext openContext) {
                         metrics.setGauge("parser.active", 1);
                     }
                     
